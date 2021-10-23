@@ -6,19 +6,21 @@ import cv2
 import imgaug.augmenters as iaa
 from PIL import Image
 import argparse
-from remove_white_edges import remove_white
+from augmentation.imgAugmentation.remove_white_edges import remove_white
 
 #多线程
 parser = argparse.ArgumentParser(description="Implementation of Augmentation")
-parser.add_argument("--data_path", type=str, default="E:/Projects/PythonCode/ResearchTool/testData/Img/",
+parser.add_argument("--data_path", type=str, default="./datasets",
                     help="path to dataset repository")
-parser.add_argument("--output_path", type=str, default="E:/Projects/PythonCode/ResearchTool/testData/Img/out/",
+parser.add_argument("--output_path", type=str, default="./out",
                     help="path to augmentation dataset repository")
+parser.add_argument("--num_workers",type=int,default=0)
 
 global args
 args =parser.parse_args()
 data_path = args.data_path
 output_path = args.output_path
+num = args.num_workers
 if not os.path.exists(output_path):
     os.mkdir(output_path)
 
@@ -48,7 +50,12 @@ def find_image_file(source_path,file_path_list):
     # print(file_names[0])
     return imglist,file_names
 
-def imgAug(imglist,file_names):
+
+def imgAug(imglist,file_names,images_folder=None):
+    if not images_folder == None:
+        for i, name in enumerate(file_names):
+            file_names[i] = images_folder + '/' + name
+
     RemoveW = iaa.Lambda(func_images=remove_white)
     # 定义一组变换方法.
     seq = iaa.Sequential([
@@ -60,28 +67,33 @@ def imgAug(imglist,file_names):
     ])
     for index,img in enumerate(imglist):
         img = seq.augment_image(img)
-        cv2.imwrite(output_path+file_names[index],img)
-        print('{} has been written'.format(output_path+file_names[index]))
+        cv2.imwrite(file_names[index],img)
+        print('{} has been written'.format(file_names[index]))
 
-
+# python main_swav_aug.py  --data_path ./data  --output_path ./flip_rotate_data --num_workers 5
 if __name__ == '__main__':
     imglist, file_names = find_image_file(data_path, [])
     print('{} pictures have been appent to imglist'.format(len(imglist)))
     # 单进程
-    imgAug(imglist, file_names)
+    if num == 0:
+        for i, name in enumerate(file_names):
+            file_names[i] = output_path + '/' + name
+        # imgAug(imglist, file_names)
     # 多进程
-    # process = []
-    # for i in range(1,6):
-    #     img_path = args.output_path + '/data' + str(i) + '/'
-    #     if not os.path.exists(img_path):
-    #        os.mkdir(img_path)
-    #     p = Process(target=imgAug,args=(imglist,file_names))
-    #     p.start()
-    #     print("*********Process%i Start**********",i)
-    #     process.append(p)
-    # for item in process:
-    #     item.join()
-    # print("***********All Process End*******************")
+    else:
+        process = []
+        for id in range(num):
+            images_folder = output_path + '/data{}'.format(id)
+            if not os.path.exists(images_folder):
+                os.mkdir(images_folder)
+            p = Process(target=imgAug,args=(imglist,file_names,images_folder))
+            p.start()
+            print("*********Process{} Start**********".format(id))
+            process.append(p)
+
+        for item in process:
+            item.join()
+    print("***********All Process End*******************")
 
 #deletewhite
 # if __name__ == '__main__':
